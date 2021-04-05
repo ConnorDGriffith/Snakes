@@ -1,3 +1,4 @@
+
 // gcc -o arrows_auto -lncurses arrows_auto.c
 #include <ncurses.h>
 #include <stdio.h>
@@ -6,12 +7,15 @@
 #include <time.h>
 #include <unistd.h>
 
+#define LOSE_MSG "GAME OVER!"
+
+int  Win =0;
 int FOOD = 1;
 enum dir { right, left, up, down };
 void printHead(WINDOW *menu_win, int x, int y, int dir);
 void randomFood(WINDOW *menu_win, int, int, int);
 int snakeSpeed(int snakeLen, int maxSpeed, int minSpeed);
-
+void killsnake();
 WINDOW *menu_win;
 int main() {
   /* Settings for screen*/
@@ -87,7 +91,7 @@ int main() {
       }
 
       else {
-        myY = rows - 3;
+        killsnake();
       }
     }
 
@@ -95,7 +99,7 @@ int main() {
       mvprintw(0, 150, "Direction: Down       ");
       mvwprintw(menu_win, myY, myX, " ");
       if (myY >= rows - 3) {
-        myY = 1;
+        killsnake();
       } else {
         myY++;
       }
@@ -107,7 +111,7 @@ int main() {
       if (myX >= 2) {
         myX--;
       } else {
-        myX = (cols - 3);
+        killsnake();
       }
     }
 
@@ -115,7 +119,8 @@ int main() {
       mvprintw(0, 150, "Direction: Right          ");
       mvwprintw(menu_win, myY, myX, " ");
       if (myX >= (cols - 3)) {
-        myX = 1;
+        
+        killsnake();
       } else {
         myX++;
       }
@@ -183,4 +188,15 @@ int snakeSpeed(int snakeLen, int maxSpeed, int minSpeed) {
 
   return speed;
 }
+
+void killsnake()
+{
+   
+        
+        	move(LINES/2-2,(COLS-sizeof(LOSE_MSG))/2); 
+		    printw(LOSE_MSG); // print msg in center of screen
+        
+        refresh();
+}
+
 
