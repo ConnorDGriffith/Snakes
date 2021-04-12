@@ -64,16 +64,20 @@ int main() {
     c = wgetch(menu_win);
     switch (c) {
     case KEY_RIGHT:
-      dir = right;
+      if (dir != left)
+        dir = right;
       break;
     case KEY_LEFT:
-      dir = left;
+      if (dir != right)
+        dir = left;
       break;
     case KEY_UP:
-      dir = up;
+      if (dir != down)
+        dir = up;
       break;
     case KEY_DOWN:
-      dir = down;
+      if (dir != up)
+        dir = down;
       break;
     case KEY_BACKSPACE:
       endwin();
@@ -198,5 +202,3 @@ void killsnake()
         
         refresh();
 }
-
-
