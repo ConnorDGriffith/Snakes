@@ -1,4 +1,3 @@
-
 // gcc -o snakeGame -lncurses snakes.c
 
 #include <ncurses.h>
@@ -9,7 +8,7 @@
 #include <unistd.h>
 
 /************************************* Game Settings*/
-int FOOD = 1;
+int FOOD = 9;
 int maxSpeed = 50000;
 int minSpeed = 250000;
 int baseSpeed = 3;
@@ -17,8 +16,20 @@ int snakeLen = 0;
 int expectedLen = 10; // if len < expected len, grow snake.
 /***************************************** DataTypes*/
 
-enum dir { right, left, up, down };
-enum state {
+// DEFINED THINGS
+
+#define LOSE "Game Over!!!"
+#define WIN "You Won!!!"
+
+enum dir
+{
+  right,
+  left,
+  up,
+  down
+};
+enum state
+{
   eraser, // to be ignored
   one,    // grow by x
   two,
@@ -34,7 +45,8 @@ enum state {
   tail  // collision = death, no food can spawn here. End of Body.
 };
 
-struct body {
+struct body
+{
   char body; // How the body will appear
   int x;     // x coordinate of the body
   int y;     // y coordinate of the body
@@ -51,10 +63,12 @@ void printStats(WINDOW *menu_win, int rows, int cols, int x, int y, int speed,
                 int dir, int actLen, int expLen);
 struct body randomFood(WINDOW *menu_win, struct body *stack, int, int, int);
 int snakeSpeed(int len, int maxSpeed, int minSpeed);
+void killsnake();
 
 int collisionCheck();
 
-int main() {
+int main()
+{
   /* Settings for screen*/
   WINDOW *menu_win;
   initscr();
@@ -69,15 +83,18 @@ int main() {
   int cols, rows;
   int c;
 
-  if (ioctl(0, TIOCGWINSZ, &wbuf) != -1) {
+  if (ioctl(0, TIOCGWINSZ, &wbuf) != -1)
+  {
     cols = wbuf.ws_col;
     rows = wbuf.ws_row;
-  } else {
+  }
+  else
+  {
     perror("Could not get screen dimensions");
     endwin();
     exit(1);
   }
-  int maxSnake = (rows * cols) + 10; // maxium length before win condition.
+  int maxSnake = (rows + cols) + FOOD; // maxium length before win condition.
   struct body BodyStack[maxSnake];
   /* Window settings */
   menu_win = newwin(rows - 1, cols - 1, 1,
@@ -98,21 +115,43 @@ int main() {
   wrefresh(menu_win);
   refresh();
 
-  while (1) {
+  while (1)
+  {
     if (c == 0)
       c = wgetch(menu_win);
-    switch (c) {
+    switch (c)
+    {
     case KEY_RIGHT:
-      dir = right;
+      if (dir == left)
+      {
+        killsnake();
+      }
+      else
+        dir = right;
       break;
     case KEY_LEFT:
-      dir = left;
+      if (dir == right)
+      {
+        killsnake();
+      }
+      else
+        dir = left;
       break;
     case KEY_UP:
-      dir = up;
+      if (dir == down)
+      {
+        killsnake();
+      }
+      else
+        dir = up;
       break;
     case KEY_DOWN:
-      dir = down;
+      if (dir == up)
+      {
+        killsnake();
+      }
+      else
+        dir = down;
       break;
     case KEY_BACKSPACE:
       endwin();
@@ -121,54 +160,75 @@ int main() {
 
     mvprintw(0, 150, "             ");
 
-    if (dir == up) {
+    if (dir == up)
+    {
       // mvwprintw(menu_win, myY, myX, " ");
-      if (myY >= 2) {
+      if (myY >= 2)
+      {
         myY--;
       }
 
-      else {
-        myY = rows - 3;
+      else
+      {
+        killsnake();
       }
     }
 
-    if (dir == down) {
+    if (dir == down)
+    {
       // mvwprintw(menu_win, myY, myX, " ");
-      if (myY >= rows - 3) {
-        myY = 1;
-      } else {
+      if (myY >= rows - 3)
+      {
+        killsnake();
+      }
+      else
+      {
         myY++;
       }
     }
 
-    if (dir == left) {
+    if (dir == left)
+    {
       // mvwprintw(menu_win, myY, myX, " ");
-      if (myX >= 2) {
+      if (myX >= 2)
+      {
         myX--;
-      } else {
-        myX = (cols - 3);
+      }
+      else
+      {
+        killsnake();
       }
     }
 
-    if (dir == right) {
+    if (dir == right)
+    {
       // mvwprintw(menu_win, myY, myX, " ");
-      if (myX >= (cols - 3)) {
-        myX = 1;
-      } else {
+      if (myX >= (cols - 3))
+      {
+        killsnake();
+      }
+      else
+      {
         myX++;
       }
     }
     printStats(menu_win, rows, cols, myX, myY,
                snakeSpeed(snakeLen, maxSpeed, minSpeed), dir, snakeLen,
                expectedLen);
-    // checkCollision();
+    //collisionCheck(BodyStack);
+
     snakeLen = growSeg(BodyStack, expectedLen, snakeLen, myX, myY, dir);
     printSnake(menu_win, BodyStack, snakeLen, dir);
-
+    if (BodyStack[snakeLen].x == food.x && BodyStack[snakeLen].y == food.y)
+    {
+      expectedLen += food.state;
+      food = randomFood(menu_win, BodyStack, FOOD, rows - 2, cols - 2);
+    }
     // printHead(menu_win, myY, myX, dir);
     usleep(snakeSpeed(snakeLen, maxSpeed, minSpeed));
 
-    if (c != 0) {
+    if (c != 0)
+    {
       c = 0;
       // flushinp();
     }
@@ -184,13 +244,21 @@ void printPit(WINDOW *menu_win, int y, int x, int dir) {}
 
 /* Prints a single pip to act as the head */
 
-void printSnake(WINDOW *menu_win, struct body *stack, int actLen, int dir) {
+void printSnake(WINDOW *menu_win, struct body *stack, int actLen, int dir)
+{
   int z = actLen;
   mvprintw(0, 225, "Debug:%d %c--", z, stack[z].body);
-  while (z >= 0) {
+  while (z >= 0)
+  {
     //   mvprintw(0, 125, "Debug:%d ",z );
     mvwprintw(menu_win, stack[z].y, stack[z].x, "%c", stack[z].body); //
     // mvprintw(0, 125, "Debug:%d  --",z );
+    if (z > 0)
+    {
+      if (stack[z - 1].y == stack[actLen].y && stack[z - 1].x == stack[actLen].x)
+        killsnake();
+    }
+
     z--;
   }
   /*
@@ -215,7 +283,8 @@ void printSnake(WINDOW *menu_win, struct body *stack, int actLen, int dir) {
   refresh();
 }
 
-void printHead(WINDOW *menu_win, int y, int x, int dir) {
+void printHead(WINDOW *menu_win, int y, int x, int dir)
+{
   char head[] = "O";
 
   mvwprintw(menu_win, y, x, "%s", head);
@@ -226,48 +295,79 @@ void printHead(WINDOW *menu_win, int y, int x, int dir) {
 /* Tosses random food (1~9) around the arena */
 
 struct body randomFood(WINDOW *menu_win, struct body *stack, int quant, int row,
-                       int col) {
+                       int col)
+{
   int x, y, z;
   time_t t;
   struct body food;
   srand((unsigned)time(&t));
-  for (int i = 0; i < quant; i++) {
-    food.x = rand() % col - 1;
-    food.y = rand() % row - 1;
-    food.state = 1 + (rand() % 9);
-    food.body = '5'; //(char)food.state;
-    mvwprintw(menu_win, food.y, food.x, "%c", food.body);
+
+  food.x = rand() % (col - 2) + 1;
+  food.y = rand() % (row - 2) + 1;
+  z = snakeLen;
+  while (z > 0)
+  {
+    if (stack[z - 1].y == stack[snakeLen].y && stack[z - 1].x == stack[snakeLen].x)
+    {
+      food.x = rand() % (col - 2) + 1;
+      food.y = rand() % (row - 2) + 1;
+      z = snakeLen;
+    }
+    z--;
   }
+  food.state = 1 + (rand() % quant);
+  food.body = food.state + 48;
+  mvwprintw(menu_win, food.y, food.x, "%c", food.body);
+
   return food;
 }
 
 /* returns a sleep value. The higher the number the slower the speed. */
 
-int snakeSpeed(int len, int maxSpeed, int minSpeed) {
+int snakeSpeed(int len, int maxSpeed, int minSpeed)
+{
   // Speed is inversely represented as wait time. The higher the return, the
   // slower the speed.
 
   int speed = 275000;
   speed = speed - (len * 1500);
 
-  if (speed <= maxSpeed) {
+  if (speed <= maxSpeed)
+  {
     return maxSpeed;
   }
 
-  if (speed >= minSpeed) {
+  if (speed >= minSpeed)
+  {
     return minSpeed;
   }
   return speed;
 }
 
 /* Conditions to kill the snake have been met */
-void killSnake() {
+void killsnake(int endgame)
+{
+
+  clear();
+  switch (endgame)
+  {
+  case 1:
+    mvprintw(LINES / 2, COLS / 2 - sizeof(WIN) / 2, WIN); // print msg in center of screen
+    break;
+  default:
+    mvprintw(LINES / 2, COLS / 2 - sizeof(LOSE) / 2, LOSE); // print msg in center of screen
+  }
+
+  refresh();
+
+  usleep(2000000);
   endwin();
   exit(1);
 }
 
 /* Create a body segment for the snake */
-int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
+int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir)
+{
   // struct body *segment;
   int z = actLen;
   int swapX, swapY;
@@ -280,9 +380,12 @@ int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
     stack[z].state = head;
     z--;
     actLen++;
-  } else {
+  }
+  else
+  {
     {
-      while (z >= 0) {
+      while (z >= 0)
+      {
         swapX = stack[z].x;
         swapY = stack[z].y;
         stack[z].y = y;
@@ -290,11 +393,13 @@ int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
         y = swapY;
         x = swapX;
 
-        if (z == 1 && actLen > 1) {
+        if (z == 1 && actLen > 1)
+        {
           stack[z].state = tail;
           stack[z].body = 'o';
         }
-        if (z == 0 && actLen > 1) {
+        if (z == 0 && actLen > 1)
+        {
           stack[z].state = eraser;
           stack[z].body = ' ';
         }
@@ -307,10 +412,13 @@ int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
 
     // stack[z - 1].body = stack[z].body;
 
-    if (z == 1 && actLen > 1) {
+    if (z == 1 && actLen > 1)
+    {
       stack[z].state = tail;
       stack[z].body = ' ';
-    } else {
+    }
+    else
+    {
       stack[z].state = stack[z].state;
     }
     z--;
@@ -319,7 +427,8 @@ int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
   return actLen;
 }
 
-struct body buildBody(int x, int y) {
+struct body buildBody(int x, int y)
+{
   struct body builder;
   builder.body = 'O';
   builder.x = x;
@@ -331,23 +440,28 @@ struct body buildBody(int x, int y) {
 
 /* Draw the screen stats for the game */
 void printStats(WINDOW *menu_win, int rows, int cols, int x, int y, int speed,
-                int dir, int expLen, int actLen) {
+                int dir, int expLen, int actLen)
+{
   mvprintw(0, 0,
            "Snakes! Backspace to quit. Number of rows: %d, Cols: %d.  My x is: "
            "%d. My y is:%d. My speed is: %d. My Actual Length is: %d My "
            "Expected Length is: %d:           ",
            rows, cols, x, y, speed, actLen, expLen);
 
-  if (dir == left) {
+  if (dir == left)
+  {
     mvprintw(0, 200, "Direction: Left        ");
   }
-  if (dir == right) {
+  if (dir == right)
+  {
     mvprintw(0, 200, "Direction: Right        ");
   }
-  if (dir == up) {
+  if (dir == up)
+  {
     mvprintw(0, 200, "Direction: Up        ");
   }
-  if (dir == down) {
+  if (dir == down)
+  {
     mvprintw(0, 200, "Direction: Down        ");
   }
 
