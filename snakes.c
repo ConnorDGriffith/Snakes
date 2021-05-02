@@ -12,8 +12,8 @@
 int FOOD = 9;         // Maximum value of the food
 int maxSpeed = 50000; // Speed is sleep in Microseconds
 int minSpeed = 250000;
-int startingLen = 13; // for game resets
-int expectedLen = 13; // Starting Length
+int startingLen = 3; // for game resets
+int expectedLen = 3; // Starting Length
 int startingDir = 4;  // Right: 0, Left: 1, Up: 2, Down: 3, Random: 4
 int extraTime = 5; // Add additional time to the Trophy countdown (in seconds)
 
@@ -77,7 +77,6 @@ struct body randomFood(WINDOW *menu_win, struct body *stack, int, int, int);
 int snakeSpeed(int len, int maxSpeed, int minSpeed);
 void endGame();
 
-int collisionCheck();
 void printFood(WINDOW *menu_win, struct body food);
 
 int main() {
