@@ -13,8 +13,8 @@ int FOOD = 9;         // Maximum value of the food
 int maxSpeed = 50000; // Speed is sleep in Microseconds
 int minSpeed = 250000;
 int expectedLen = 10; // Starting Length
-int startingDir = 4; // Right: 0, Left: 1, Up: 2, Down: 3, Random: 4
-int extraTime = 5;   // Add additional time to the Trophy countdown (in seconds)
+int startingDir = 4;  // Right: 0, Left: 1, Up: 2, Down: 3, Random: 4
+int extraTime = 5; // Add additional time to the Trophy countdown (in seconds)
 /************************************* Functional Globals*/
 
 int highScore = 0;     // Persists: Longest Snake Length
@@ -22,8 +22,8 @@ int trophyCapture = 0; // Persists: Last number of Trophy captured
 int trophyFade = 0;    // Persists: Prev Game Faded
 int gameNum = 1;       // How many games have been played.
 
-int snakeLen = 0;                // Actual length of the snake.
-int foodExp, foodExpCeiling = 0; // lifespan of tropy
+int snakeLen = 0;                           // Actual length of the snake.
+int foodExp, foodExpCeiling, foodFlash = 0; // lifespan of tropy
 
 // DEFINED THINGS
 
@@ -75,34 +75,32 @@ int snakeSpeed(int len, int maxSpeed, int minSpeed);
 void killsnake();
 
 int collisionCheck();
+void printFood(WINDOW *menu_win, struct body food);
 
 int main() {
   /************************************* Settings for screen*/
 
   WINDOW *menu_win;
-  initscr();     // Initialize ncurses
-  clear();       // Clear anything on screen (cut?)
-  noecho();      // Turn off key echo
-  curs_set(0);   // Hide the cursor
-  cbreak();      // Disable line Buffering
+  initscr();   // Initialize ncurses
+  clear();     // Clear anything on screen (cut?)
+  noecho();    // Turn off key echo
+  curs_set(0); // Hide the cursor
+  cbreak();    // Disable line Buffering
 
- /************************************* Define colors for use*/
-if (has_colors())
-    {
-        start_color();
+  /************************************* Define colors for use*/
+  if (has_colors()) {
+    start_color();
 
-        init_pair(1, COLOR_CYAN,    COLOR_GREEN);   // New Snake
-        init_pair(2, COLOR_RED,   COLOR_GREEN);     // Beginner Snake
-        init_pair(3, COLOR_YELLOW,  COLOR_GREEN);   // Intermediate Snake
-        init_pair(4, COLOR_BLUE,    COLOR_GREEN);   // Professional Snake
-        init_pair(5, COLOR_GREEN,    COLOR_WHITE);    // Food New
-        init_pair(6, COLOR_MAGENTA, COLOR_WHITE);       // Food Mid
-        init_pair(7, COLOR_RED, COLOR_WHITE);       // Food Fading
-        init_pair(8, COLOR_RED,    COLOR_BLACK);    // Flash food 1
-        init_pair(9, COLOR_WHITE, COLOR_RED);       // Flash food 2
-    }
-
-
+    init_pair(1, COLOR_CYAN, COLOR_GREEN);    // New Snake
+    init_pair(2, COLOR_RED, COLOR_GREEN);     // Beginner Snake
+    init_pair(3, COLOR_YELLOW, COLOR_GREEN);  // Intermediate Snake
+    init_pair(4, COLOR_BLUE, COLOR_GREEN);    // Professional Snake
+    init_pair(5, COLOR_GREEN, COLOR_WHITE);   // Food New
+    init_pair(6, COLOR_MAGENTA, COLOR_WHITE); // Food Mid
+    init_pair(7, COLOR_RED, COLOR_WHITE);     // Food Fading
+    init_pair(8, COLOR_RED, COLOR_BLACK);     // Flash food 1
+    init_pair(9, COLOR_WHITE, COLOR_RED);     // Flash food 2
+  }
 
   /************************************ Primary (Local) Variables*/
 
@@ -239,7 +237,7 @@ if (has_colors())
       trophyLost++;
       if (trophyLost > trophyFade)
         trophyFade = trophyLost;
-      
+
       food = randomFood(menu_win, BodyStack, FOOD, rows - 2, cols - 2); // New
     }
 
@@ -247,12 +245,12 @@ if (has_colors())
     if (BodyStack[snakeLen].x == food.x && BodyStack[snakeLen].y == food.y) {
       expectedLen += food.state;
       trophyCount++;
-      if(trophyCount > trophyCapture)
-      trophyCapture=trophyCount;
+      if (trophyCount > trophyCapture)
+        trophyCapture = trophyCount;
 
       food = randomFood(menu_win, BodyStack, FOOD, rows - 2, cols - 2);
     }
-
+    printFood(menu_win, food);
     usleep(snakeSpeed(snakeLen, maxSpeed, minSpeed)); // hold rendering.
 
     if (c != 0) {
@@ -276,29 +274,28 @@ void printPit(WINDOW *menu_win, int y, int x, int dir) {}
 /* Prints a single pip to act as the head */
 
 void printSnake(WINDOW *menu_win, struct body *stack, int actLen, int maxLen) {
-    int color;
-    
-    int snakeRank = 100*actLen/maxLen;
-    if (snakeRank <=25)
+  int color;
+
+  int snakeRank = 100 * actLen / maxLen;
+  if (snakeRank <= 25)
     color = 1;
-    else if (snakeRank >25 &&snakeRank <=50)
+  else if (snakeRank > 25 && snakeRank <= 50)
     color = 2;
-    else if (snakeRank >50 &&snakeRank <=75)
+  else if (snakeRank > 50 && snakeRank <= 75)
     color = 3;
-else {
-color = 4;
-}
-    
-    wattron(menu_win,COLOR_PAIR(color));
+  else {
+    color = 4;
+  }
+
+  wattron(menu_win, COLOR_PAIR(color));
   int z = actLen;
   while (z >= 0) {
-    if (z == 0)
-    {
-     wattroff(menu_win,COLOR_PAIR(color));
+    if (z == 0) {
+      wattroff(menu_win, COLOR_PAIR(color));
     }
     mvwprintw(menu_win, stack[z].y, stack[z].x, "%c", stack[z].body); //
     // mvprintw(0, 125, "Debug:%d  --",z );
-    
+
     if (z > 0) {
       if (stack[z - 1].y == stack[actLen].y &&
           stack[z - 1].x == stack[actLen].x)
@@ -328,29 +325,56 @@ struct body randomFood(WINDOW *menu_win, struct body *stack, int quant, int row,
   int x, y, z;
   struct body food;
   time_t t;
+
   srand((unsigned)time(&t));
 
-  foodExp = (1 + (rand() % quant)+extraTime) * 1000000; // Food life in Microseconds.
+  foodExp = (1 + (rand() % quant) + extraTime) *
+            1000000; // Food life in Microseconds.
   foodExpCeiling = foodExp;
 
   food.x = rand() % (col - 2) + 1;
   food.y = rand() % (row - 2) + 1;
-  z = snakeLen;
+  z = snakeLen - 1;
   while (z > 0) {
-    if (stack[z - 1].y == stack[snakeLen].y &&
-        stack[z - 1].x == stack[snakeLen].x) {
+    if (stack[z].y == stack[snakeLen].y && stack[z].x == stack[snakeLen].x) {
       food.x = rand() % (col - 2) + 1;
       food.y = rand() % (row - 2) + 1;
-      z = snakeLen;
+      z = snakeLen - 1;
     }
     z--;
   }
   food.state = 1 + (rand() % quant); // Between 1 and foodMax
   food.body = food.state + 48;       // number to char of that number
-  mvwprintw(menu_win, food.y, food.x, "%c",
-            food.body); // Print that food in place.
 
   return food;
+}
+
+void printFood(WINDOW *menu_win, struct body food) {
+  int color;
+
+  int foodHealth = 100 * foodExp / foodExpCeiling;
+  if (foodHealth <= 25) {
+    if (foodFlash == 0) {
+      color = 8;
+      foodFlash = 1;
+    } else {
+      color = 9;
+      foodFlash = 0;
+    }
+
+  } else if (foodHealth > 25 && foodHealth <= 50) {
+    color = 7;
+  } else if (foodHealth > 50 && foodHealth <= 75) {
+    color = 6;
+  } else {
+    color = 5;
+  }
+
+  wattron(menu_win, COLOR_PAIR(color));
+
+  mvwprintw(menu_win, food.y, food.x, "%c",
+            food.body); // Print that food in place.
+  wattroff(menu_win, COLOR_PAIR(color));
 }
 
 /* returns a sleep value. The higher the number the slower the speed. */
