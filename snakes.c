@@ -12,10 +12,11 @@
 int FOOD = 9;         // Maximum value of the food
 int maxSpeed = 50000; // Speed is sleep in Microseconds
 int minSpeed = 250000;
+int speedMod = 1;   // increase the rate of speed change
 int startingLen = 3; // for game resets
 int expectedLen = 3; // Starting Length
 int startingDir = 4;  // Right: 0, Left: 1, Up: 2, Down: 3, Random: 4
-int extraTime = 5; // Add additional time to the Trophy countdown (in seconds)
+int extraTime = 0; // Add additional time to the Trophy countdown (in seconds)
 
 /************************************* Functional Globals*/
 
@@ -23,7 +24,6 @@ int trophyCapture = 0; // Persists: Last number of Trophy captured
 int trophyFade = 0;    // Persists: Prev Game Faded
 int gameCont = 1;      // Tells the game to continue.
 int gameNum = 1;       // How many games have been played.
-int totaltrophies = 0; // total trophies generated through the course of the game
 
 int snakeLen = 0;                           // Actual length of the snake.
 int foodExp, foodExpCeiling, foodFlash = 0; // lifespan of tropy
@@ -73,11 +73,12 @@ void printHead(WINDOW *menu_win, int x, int y, int dir);
 void printSnake(WINDOW *menu_win, struct body *stack, int actLen, int maxLen,
                 int rows, int cols);
 void printStats(WINDOW *menu_win, int rows, int cols, int x, int y, int speed,
-                int dir, int expLen, int actLen);
+                int dir, int expLen, int actLen, int capt, int fade);
 struct body randomFood(WINDOW *menu_win, struct body *stack, int, int, int);
 int snakeSpeed(int len, int maxSpeed, int minSpeed);
 void endGame();
 
+int collisionCheck();
 void printFood(WINDOW *menu_win, struct body food);
 
 int main() {
@@ -105,7 +106,7 @@ int main() {
     init_pair(9, COLOR_WHITE, COLOR_RED);     // Flash food 2
   }
 
-  /* Primary Infinite Loop */
+  /* Primary Infinit Loop */
   while (1) {
 
     /************************************ Primary (Local) Variables*/
@@ -113,15 +114,14 @@ int main() {
     struct winsize wbuf;
 
     int cols, rows; // Holds the rows and columns for the screen
-	int midcols, midrows;
     int c;          // Receives input
+    int trophyCount = 0;
+    int trophyLost = 0;
 
     /* Capture window dimensions */
     if (ioctl(0, TIOCGWINSZ, &wbuf) != -1) {
       cols = wbuf.ws_col;
       rows = wbuf.ws_row;
-	  midcols = cols / 2;
-	  midrows = rows / 2;
     } else {
       perror("Could not get screen dimensions");
       endwin();
@@ -129,15 +129,15 @@ int main() {
     }
     // Provide a warning of game start
 
-    mvprintw(midrows, midcols - 9, "Game Starting in....");
+    mvprintw((rows / 2), (cols / 2) - 9, "Game Starting in....");
     refresh();
     for (int i = 3; i > 0; i--) {
       sleep(1);
       clear();
-      mvprintw(midrows, midcols, "%d", i);
+      mvprintw((rows / 2), cols / 2, "%d", i);
       refresh();
     }
-    mvprintw(midrows, midcols - 3, "GO!!!!");
+    mvprintw((rows / 2), (cols / 2) - 3, "GO!!!!");
     sleep(1);
 
     time_t t;                  // Get the time
@@ -158,8 +158,8 @@ int main() {
 
     /********************************** Initial state */
 
-    int myX = (midcols / 2); // Initial X
-    int myY = (midrows / 2); // Initial Y
+    int myX = ((cols - 2) / 2); // Initial X
+    int myY = ((rows - 2) / 2); // Initial Y
     int dir = 0;                // Direction of the movement of the snake.
     if (startingDir < 3) {
       dir = startingDir;
@@ -169,7 +169,7 @@ int main() {
 
     printStats(menu_win, rows, cols, myX, myY,
                snakeSpeed(snakeLen, maxSpeed, minSpeed), dir, expectedLen,
-               snakeLen);
+               snakeLen, trophyCount, trophyLost);
     struct body food =
         randomFood(menu_win, BodyStack, FOOD, rows - 2, cols - 2);
     // printHead(menu_win, myY, myX, dir);
@@ -221,10 +221,9 @@ int main() {
 
       printStats(menu_win, rows, cols, myX, myY,
                  snakeSpeed(snakeLen, maxSpeed, minSpeed), dir, expectedLen,
-                 snakeLen);
+                 snakeLen, trophyCount, trophyLost);
 
-      // Grow the snake
-
+      // Grow or move the snake 
       snakeLen = growSeg(BodyStack, expectedLen, snakeLen, myX, myY, dir);
       // Print the new locations. Also test collision
       printSnake(menu_win, BodyStack, snakeLen, maxSnake, rows, cols);
@@ -234,8 +233,10 @@ int main() {
         foodExp -= snakeSpeed(snakeLen, maxSpeed, minSpeed); // not yet
       } else {
         mvwprintw(menu_win, food.y, food.x, " "); // Erase that food in place.
-        trophyFade++;
-        
+        trophyLost++;
+        if (trophyLost > trophyFade)
+          trophyFade = trophyLost;
+
         food = randomFood(menu_win, BodyStack, FOOD, rows - 2, cols - 2); // New
       }
 
@@ -243,8 +244,10 @@ int main() {
 
       if (BodyStack[snakeLen].x == food.x && BodyStack[snakeLen].y == food.y) {
         expectedLen += food.state;
-        trophyCapture++;
-		
+        trophyCount++;
+        if (trophyCount > trophyCapture)
+          trophyCapture = trophyCount;
+
         food = randomFood(menu_win, BodyStack, FOOD, rows - 2, cols - 2);
       }
       printFood(menu_win, food); // Always print the food.
@@ -265,9 +268,8 @@ int main() {
     }
 
     /* Reset the game back to the starting condition*/
-    trophyFade = 0;
-    trophyCapture = 0;
-    totaltrophies = 0;
+    trophyFade = trophyLost;
+    trophyCapture = trophyCount;
     snakeLen = 0;              // reset the snake.
     expectedLen = startingLen; // reset the starting length
     gameNum++;                 // next game
@@ -357,7 +359,7 @@ struct body randomFood(WINDOW *menu_win, struct body *stack, int quant, int row,
   // Generate value of food.
   food.state = 1 + (rand() % quant); // Between 1 and foodMax
   food.body = food.state + 48;       // number to char of that number
-  totaltrophies++;
+
   return food;
 }
 
@@ -402,7 +404,7 @@ int snakeSpeed(int len, int maxSpeed, int minSpeed) {
   // slower the speed.
 
   int speed = 275000;
-  speed = speed - (len * 1500);
+  speed = speed - speedMod * (len * 1500);
 
   if (speed <= maxSpeed) {
     return maxSpeed;
@@ -463,7 +465,7 @@ int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
 
         if (z == 1 && actLen > 1) {
           stack[z].state = tail;
-          stack[z].body = '*';
+          stack[z].body = 'o';
         }
         if (z == 0 && actLen > 1) {
           stack[z].state = eraser;
@@ -484,7 +486,7 @@ int growSeg(struct body *stack, int exlen, int actLen, int x, int y, int dir) {
 
 struct body buildBody(int x, int y) {
   struct body builder;
-  builder.body = '*';
+  builder.body = 'O';
   builder.x = x;
   builder.y = y;
   builder.state = body;
@@ -494,25 +496,23 @@ struct body buildBody(int x, int y) {
 
 /* Draw the screen stats for the game */
 void printStats(WINDOW *menu_win, int rows, int cols, int x, int y, int speed,
-                int dir, int expLen, int actLen) {
-  //int temp = trophyCapture + trophyFade;
+                int dir, int expLen, int actLen, int capt, int fade) {
+
   if (cols > 50 && cols < 100) {
     mvprintw(
         0, 0,
         "Round: %d | %d rem. Score: %d. Eaten: %d/%d | Missed: %d/%d.       ",
-        gameNum, (rows + cols - actLen), actLen, trophyCapture,totaltrophies,
-        trophyFade,totaltrophies );
+        gameNum, (rows + cols - actLen), actLen, capt, trophyCapture, fade,
+        trophyFade);
   } else if (cols >= 100) {
     mvprintw(0, 0,
              "Snakes game: %d | %d to win. Current Score: %d. Trophies "
              "Captured: %d/%d | Trophies Lost: %d/%d.          ",
-             gameNum, (rows + cols - actLen), actLen, trophyCapture, totaltrophies,
-             trophyFade, totaltrophies);
+             gameNum, (rows + cols - actLen), actLen, capt, trophyCapture, fade,
+             trophyFade);
 
   } else {
-    mvprintw(0, 0, "G: %d | S: %d. T: %d/%d |   ", gameNum, actLen,
-             trophyCapture,  totaltrophies);
+    mvprintw(0, 0, "G: %d | S: %d. T: %d/%d |   ", gameNum, actLen, capt,
+             trophyCapture);
   }
 }
-
-
